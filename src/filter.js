@@ -68,3 +68,29 @@ export function classify(body, { hasMedia = false, suppressEmojiOnly = true } = 
   if (!hasMedia && suppressEmojiOnly && isEmojiOnly(text)) return { kind: 'reaction', reason: 'emoji-only' };
   return { kind: 'message' };
 }
+
+const VERB_EMOJI = { liked: '👍', loved: '❤️', disliked: '👎', 'laughed at': '😂', emphasized: '‼️', emphasised: '‼️', questioned: '❓' };
+const REMOVED_EMOJI = { like: '👍', heart: '❤️', dislike: '👎', laugh: '😂', exclamation: '‼️', emphasis: '‼️', 'question mark': '❓' };
+
+/**
+ * Pull the emoji and the quoted message out of a tapback, so it can be shown
+ * on the right message in the web app.
+ * @returns {{ emoji: string, quoted: string | null, remove: boolean } | null}
+ */
+export function parseTapback(body) {
+  const text = (body || '').trim();
+  if (!isReaction(text)) return null;
+  const quoteMatch = text.match(/["“”'‘’](.*)["“”'‘’…]$/su);
+  const quoted = quoteMatch ? quoteMatch[1].replace(/…$/, '').trim() : null;
+  let m;
+  if ((m = text.match(/^(liked|loved|disliked|laughed at|emphasi[sz]ed|questioned)\s/i))) {
+    return { emoji: VERB_EMOJI[m[1].toLowerCase()], quoted, remove: false };
+  }
+  if ((m = text.match(/^reacted\s+(.{1,16}?)\s+to\s/iu)) || (m = text.match(/^([\p{Extended_Pictographic}\u{1F3FB}-\u{1F3FF}‍️]+)\s+to\s/iu))) {
+    return { emoji: m[1], quoted, remove: false };
+  }
+  if ((m = text.match(/^removed\s+(?:an?\s+)?(.{1,30}?)\s+from\s/iu))) {
+    return { emoji: REMOVED_EMOJI[m[1].toLowerCase()] || m[1], quoted, remove: true };
+  }
+  return null;
+}

@@ -76,3 +76,12 @@ test('commands', () => {
   assert.deepEqual(classify('name Coach Dan'), { kind: 'command', command: 'name', arg: 'Coach Dan' });
   assert.equal(classify('please stop texting me so early').kind, 'message');
 });
+
+import { parseTapback } from '../src/filter.js';
+test('parseTapback maps tapbacks to emoji and the quoted text', () => {
+  assert.deepEqual(parseTapback('Loved “Coach Dan: Practice moved…”'), { emoji: '❤️', quoted: 'Coach Dan: Practice moved', remove: false });
+  assert.deepEqual(parseTapback('Reacted 🎉 to “We won”'), { emoji: '🎉', quoted: 'We won', remove: false });
+  assert.deepEqual(parseTapback('Removed a heart from “abc”'), { emoji: '❤️', quoted: 'abc', remove: true });
+  assert.deepEqual(parseTapback('Laughed at an image'), { emoji: '😂', quoted: null, remove: false });
+  assert.equal(parseTapback('hello'), null);
+});

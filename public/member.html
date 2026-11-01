@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Group</title>
+<link rel="manifest" href="/m/__TOKEN__/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#2f6fed">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="m-body">
+<div class="m-app">
+  <header class="m-head">
+    <div>
+      <div class="m-title" id="g-name">&nbsp;</div>
+      <div class="m-sub" id="g-sub">&nbsp;</div>
+    </div>
+    <button class="m-icon" id="open-settings" aria-label="Settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </header>
+
+  <div class="m-banner hidden" id="banner"></div>
+
+  <main class="m-feed" id="feed" aria-live="polite"></main>
+
+  <div class="m-picker hidden" id="picker" role="menu"></div>
+
+  <form class="m-compose" id="compose">
+    <div class="m-note hidden" id="announce-note">Only organizers message everyone. Your message goes to the organizers.</div>
+    <div class="row" style="flex-wrap:nowrap">
+      <textarea id="input" rows="1" placeholder="Message" aria-label="Message"></textarea>
+      <button class="primary m-send" aria-label="Send">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 20.5 21 12 3 3.5 3 10l12 2-12 2z"/></svg>
+      </button>
+    </div>
+  </form>
+</div>
+
+<div class="m-sheet hidden" id="settings">
+  <div class="m-sheet-card">
+    <div class="row"><h2>Settings</h2><span class="spacer"></span><button class="link" id="close-settings">Done</button></div>
+    <label>Your name in the group</label>
+    <div class="row" style="flex-wrap:nowrap"><input id="my-name" maxlength="40"><button id="save-name">Save</button></div>
+    <label class="row" style="margin-top:16px"><input type="checkbox" id="mute" style="width:auto"> <span style="color:var(--ink)">Mute this group</span></label>
+    <label>Notifications</label>
+    <div id="notif-state" class="small"></div>
+    <p class="small muted" style="margin-top:16px">Reactions never send notifications, to you or anyone else. Only real messages do.</p>
+    <p class="small muted">This page is your personal link. Don't share it: anyone with it can post as you.</p>
+  </div>
+</div>
+
+<script>
+const TOKEN = '__TOKEN__';
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const linkify = (s) => esc(s).replace(/https?:\/\/[^\s<]+/g, (u) => `<a href="${u}" target="_blank" rel="noopener">${u}</a>`);
+const state = { me: null, group: null, emoji: [], messages: [], lastKey: '', pickerFor: null };
+
+async function api(path, opts = {}) {
+  const res = await fetch(`/api/m/${TOKEN}${path}`, {
+    method: opts.method || 'GET',
+    headers: opts.body ? { 'Content-Type': 'application/json' } : {},
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Something went wrong');
+  return data;
+}
+
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+
+function when(iso) {
+  const d = new Date(iso.replace(' ', 'T') + 'Z');
+  const today = new Date().toDateString() === d.toDateString();
+  return today ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : d.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+async function load() {
+  try {
+    const info = await api('');
+    state.me = info.me; state.group = info.group; state.emoji = info.reactionEmoji; state.vapid = info.vapidPublicKey;
+  } catch (e) {
+    document.body.innerHTML = `<div class="login"><div class="card"><h2>This link isn't active</h2><p class="muted">${esc(e.message)}</p></div></div>`;
+    return;
+  }
+  document.title = state.group.name;
+  $('#g-name').textContent = state.group.name;
+  renderSub();
+  $('#announce-note').classList.toggle('hidden', !(state.group.mode === 'announce' && state.me.role !== 'admin'));
+  $('#my-name').value = state.me.name;
+  $('#mute').checked = state.me.muted;
+  await refresh();
+  setInterval(refresh, 3000);
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && refresh());
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+  renderBanner();
+}
+
+function renderSub() {
+  const n = state.group.memberCount;
+  $('#g-sub').textContent = `${n} member${n === 1 ? '' : 's'}` + (state.me.muted ? ' · muted' : '');
+}
+let ticks = 0;
+async function refresh() {
+  if (++ticks % 10 === 0) api('').then((i) => { state.group = i.group; renderSub(); }).catch(() => {});
+  try { state.messages = await api('/messages'); } catch { return; }
+  render();
+}
+
+function render() {
+  const key = JSON.stringify(state.messages.map((m) => [m.id, m.reactions]));
+  if (key === state.lastKey) return;
+  state.lastKey = key;
+  const feed = $('#feed');
+  const atBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 80;
+  if (!state.messages.length) {
+    feed.innerHTML = `<div class="empty">No messages yet.<br>Say hi to ${esc(state.group.name)}!</div>`;
+    return;
+  }
+  let prevSender = null, prevDay = null;
+  feed.innerHTML = state.messages.map((m) => {
+    const day = new Date(m.createdAt.replace(' ', 'T') + 'Z').toDateString();
+    const dayRow = day !== prevDay ? `<div class="m-day">${day === new Date().toDateString() ? 'Today' : esc(day)}</div>` : '';
+    const showName = !m.fromMe && (m.sender !== prevSender || dayRow);
+    prevSender = m.sender; prevDay = day;
+    const reactions = m.reactions.length ? `<div class="m-reacts">${m.reactions.map((r) =>
+      `<button class="m-react ${r.mine ? 'mine' : ''}" data-id="${m.id}" data-emoji="${esc(r.emoji)}" title="${esc(r.names.join(', '))}">${esc(r.emoji)} ${r.count > 1 ? r.count : ''}</button>`).join('')}</div>` : '';
+    const media = m.mediaUrls.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener"><img class="m-img" src="${esc(u)}" alt="Photo" loading="lazy"></a>`).join('');
+    return `${dayRow}<div class="m-row ${m.fromMe ? 'me' : ''}">
+      ${showName ? `<div class="m-name">${esc(m.sender)}${m.organizer ? ' <span class="chip">organizer</span>' : ''}</div>` : ''}
+      <div class="m-bubble-wrap">
+        <div class="m-bubble ${m.fromMe ? 'me' : ''} ${m.quiet ? 'quiet' : ''}" data-id="${m.id}" tabindex="0">${media}${m.body ? linkify(m.body) : ''}</div>
+        <button class="m-add" data-add="${m.id}" aria-label="React">☺</button>
+      </div>
+      ${reactions}
+      <div class="m-meta">${when(m.createdAt)}${m.toOrganizers ? ' · to organizers' : ''}</div>
+    </div>`;
+  }).join('');
+  if (atBottom || !feed.dataset.init) { feed.scrollTop = feed.scrollHeight; feed.dataset.init = 1; }
+}
+
+// reactions: tap the ☺ next to a message, or double-tap the bubble
+const feed = $('#feed');
+feed.addEventListener('click', (e) => {
+  const chip = e.target.closest('.m-react');
+  if (chip) return react(+chip.dataset.id, chip.dataset.emoji);
+  const add = e.target.closest('[data-add]');
+  if (add) return openPicker(+add.dataset.add, add);
+});
+feed.addEventListener('dblclick', (e) => {
+  const b = e.target.closest('.m-bubble');
+  if (b) react(+b.dataset.id, '❤️');
+});
+function openPicker(id, anchor) {
+  const p = $('#picker');
+  p.innerHTML = state.emoji.map((e) => `<button data-pick="${e}" aria-label="React ${e}">${e}</button>`).join('');
+  const r = anchor.getBoundingClientRect();
+  p.style.top = Math.max(8, r.top - 52) + 'px';
+  p.style.left = Math.min(window.innerWidth - 260, Math.max(8, r.left - 120)) + 'px';
+  p.classList.remove('hidden');
+  state.pickerFor = id;
+}
+$('#picker').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-pick]');
+  if (b) react(state.pickerFor, b.dataset.pick);
+  $('#picker').classList.add('hidden');
+});
+document.addEventListener('click', (e) => { if (!e.target.closest('#picker, [data-add]')) $('#picker').classList.add('hidden'); });
+
+async function react(id, emoji) {
+  // optimistic update so it feels instant
+  const m = state.messages.find((x) => x.id === id);
+  if (m) {
+    let r = m.reactions.find((x) => x.emoji === emoji);
+    if (r?.mine) { r.count--; r.mine = false; if (!r.count) m.reactions = m.reactions.filter((x) => x !== r); }
+    else if (r) { r.count++; r.mine = true; }
+    else m.reactions.push({ emoji, count: 1, names: [state.me.name], mine: true });
+    render();
+  }
+  try { await api('/reactions', { method: 'POST', body: { messageId: id, emoji } }); } finally { refresh(); }
+}
+
+// composing
+const input = $('#input');
+input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 140) + 'px'; });
+input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !isIOS()) { e.preventDefault(); $('#compose').requestSubmit(); } });
+$('#compose').onsubmit = async (e) => {
+  e.preventDefault();
+  const body = input.value.trim();
+  if (!body) return;
+  input.value = ''; input.style.height = 'auto';
+  try { await api('/messages', { method: 'POST', body: { body } }); } catch (err) { input.value = body; alertBanner(err.message); }
+  state.lastKey = ''; await refresh();
+  feed.scrollTop = feed.scrollHeight;
+};
+
+// notifications
+function alertBanner(text) {
+  const b = $('#banner'); b.innerHTML = esc(text); b.classList.remove('hidden');
+}
+async function currentSubscription() {
+  if (!pushSupported()) return null;
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+async function enableNotifications() {
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') { renderBanner(); return; }
+  const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+  await navigator.serviceWorker.ready;
+  const key = Uint8Array.from(atob(state.vapid.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - state.vapid.length % 4) % 4)), (c) => c.charCodeAt(0));
+  const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+  await api('/push', { method: 'POST', body: sub.toJSON() });
+  renderBanner();
+}
+async function renderBanner() {
+  const b = $('#banner');
+  let html = '', state2 = '';
+  if (isIOS() && !isStandalone()) {
+    html = `<strong>Get notifications for free:</strong> tap <span class="m-share" aria-label="Share">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 8l5-5 5 5M5 12v8h14v-8"/></svg></span>
+      Share, then <strong>Add to Home Screen</strong>. Open it from your home screen and turn on notifications.`;
+    state2 = 'Add this page to your Home Screen first (Share, then Add to Home Screen), then open it from there.';
+  } else if (!pushSupported()) {
+    html = '';
+    state2 = "This browser can't show notifications. Try Chrome or Safari.";
+  } else if (Notification.permission === 'denied') {
+    html = '';
+    state2 = 'Notifications are blocked. Turn them on for this site in your phone or browser settings.';
+  } else {
+    const sub = await currentSubscription().catch(() => null);
+    if (sub && Notification.permission === 'granted') {
+      api('/push', { method: 'POST', body: sub.toJSON() }).catch(() => {});
+      state2 = 'On. New messages show up like a text. Reactions stay silent.';
+    } else {
+      html = `<div class="row" style="flex-wrap:nowrap"><span>Get a notification when someone posts. Reactions never buzz.</span><button class="primary" id="enable-push">Turn on</button></div>`;
+      state2 = '<button class="primary" id="enable-push-2">Turn on notifications</button>';
+    }
+  }
+  b.innerHTML = html; b.classList.toggle('hidden', !html);
+  $('#notif-state').innerHTML = state2;
+  for (const id of ['#enable-push', '#enable-push-2']) { const el = $(id); if (el) el.onclick = () => enableNotifications().catch((e) => alertBanner(e.message)); }
+}
+
+// settings
+$('#open-settings').onclick = () => { $('#settings').classList.remove('hidden'); renderBanner(); };
+$('#close-settings').onclick = () => $('#settings').classList.add('hidden');
+$('#settings').onclick = (e) => { if (e.target.id === 'settings') $('#settings').classList.add('hidden'); };
+$('#save-name').onclick = async () => {
+  const r = await api('', { method: 'PATCH', body: { name: $('#my-name').value } });
+  state.me.name = r.name; $('#save-name').textContent = 'Saved'; setTimeout(() => ($('#save-name').textContent = 'Save'), 1500);
+};
+$('#mute').onchange = async () => {
+  const r = await api('', { method: 'PATCH', body: { muted: $('#mute').checked } });
+  state.me.muted = r.muted;
+  renderSub();
+};
+
+load();
+</script>
+</body>
+</html>

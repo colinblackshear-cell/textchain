@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TextChain</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<div id="login" class="login hidden">
+  <div class="brand"><span class="dot"></span>TextChain</div>
+  <p class="muted">Group texts for schools, clubs, and teams. No app, no reaction pings.</p>
+  <form id="login-form" class="card">
+    <label for="pw">Organizer password</label>
+    <input id="pw" type="password" autocomplete="current-password" autofocus>
+    <div class="error" id="login-error"></div>
+    <button class="primary" style="width:100%;margin-top:8px">Log in</button>
+  </form>
+</div>
+
+<div id="app" class="shell hidden">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>TextChain</div>
+    <div class="group-list" id="group-list"></div>
+    <button id="new-group-btn">+ New group</button>
+    <div class="spacer"></div>
+    <div class="small muted" id="provider-note"></div>
+    <div class="row small">
+      <a href="/sim" id="sim-link" class="hidden">Phone simulator</a>
+      <span class="spacer"></span>
+      <button class="link small" id="logout">Log out</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- new group -->
+    <section id="new-group" class="card hidden" style="max-width:520px">
+      <h2>New group</h2>
+      <p class="muted small">Each group gets its own phone number. Members text that number and everyone in the group gets it, like a normal text.</p>
+      <form id="new-group-form">
+        <label>Group name</label>
+        <input name="name" placeholder="Lincoln Robotics" required>
+        <label>Group phone number</label>
+        <input name="phoneNumber" placeholder="+1 555 000 1000" required>
+        <div class="small muted" id="number-help" style="margin-top:4px"></div>
+        <label>Who can text the whole group?</label>
+        <select name="mode">
+          <option value="chat">Everyone (group chat)</option>
+          <option value="announce">Only organizers (announcements; replies go to organizers)</option>
+        </select>
+        <div class="error" id="new-group-error"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="primary">Create group</button>
+          <button type="button" id="cancel-new-group">Cancel</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- empty -->
+    <section id="nothing" class="empty hidden">
+      <h2>Create your first group</h2>
+      <p>Add a group, add members by phone number, and they'll get a text inviting them to join.</p>
+      <button class="primary" onclick="showNewGroup()">+ New group</button>
+    </section>
+
+    <!-- group view -->
+    <section id="group" class="hidden">
+      <div class="header">
+        <div>
+          <h1 id="g-name"></h1>
+          <div class="number" id="g-number"></div>
+        </div>
+        <div class="spacer"></div>
+        <div>
+          <label style="margin-top:0">Who can text the whole group?</label>
+          <select id="g-mode">
+            <option value="chat">Everyone</option>
+            <option value="announce">Only organizers</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="n" id="s-active">0</div><div class="l">members joined</div></div>
+        <div class="stat"><div class="n" id="s-invited">0</div><div class="l">invites pending</div></div>
+        <div class="stat"><div class="n" id="s-msgs">0</div><div class="l">messages sent</div></div>
+        <div class="stat quiet"><div class="n" id="s-quiet">0</div><div class="l">reactions kept silent</div></div>
+      </div>
+
+      <div class="tabs">
+        <button data-tab="messages" class="active">Messages</button>
+        <button data-tab="members">Members</button>
+        <button data-tab="settings">Settings</button>
+      </div>
+
+      <div id="tab-messages">
+        <div class="feed" id="feed"></div>
+        <form class="composer" id="broadcast-form">
+          <textarea id="broadcast-body" rows="1" placeholder="Text the whole group..."></textarea>
+          <button class="primary">Send</button>
+        </form>
+        <div class="row small muted" style="margin-top:6px">
+          <span>Sends as</span>
+          <input id="from-name" style="width:180px;padding:4px 8px" placeholder="Organizer">
+          <span id="seg-count"></span>
+        </div>
+      </div>
+
+      <div id="tab-members" class="hidden">
+        <table>
+          <thead><tr><th>Name</th><th>Phone</th><th>Role</th><th>Status</th><th></th></tr></thead>
+          <tbody id="members"></tbody>
+        </table>
+        <div class="grid2">
+          <form class="card" id="add-member-form">
+            <h3>Add a member</h3>
+            <label>Name</label><input name="name" required>
+            <label>Mobile number</label><input name="phone" required placeholder="555-201-3344">
+            <label>Role</label>
+            <select name="role"><option value="member">Member</option><option value="admin">Organizer</option></select>
+            <div class="error" id="add-member-error"></div>
+            <button class="primary" style="margin-top:8px">Add and send invite</button>
+          </form>
+          <form class="card" id="bulk-form">
+            <h3>Paste a list</h3>
+            <label>One per line: name and number</label>
+            <textarea name="text" rows="7" placeholder="Maya Ruiz, 555-201-3344&#10;Jordan Lee 555-201-9876"></textarea>
+            <div class="error" id="bulk-error"></div>
+            <button class="primary" style="margin-top:8px">Add all and send invites</button>
+          </form>
+        </div>
+        <p class="small muted">Everyone added gets one text asking them to reply YES. They won't get group texts until they do, and can reply STOP anytime.</p>
+      </div>
+
+      <div id="tab-settings" class="hidden">
+        <div class="card">
+          <label style="margin-top:0" class="row"><input type="checkbox" id="g-emoji" style="width:auto"> <span style="color:var(--ink)">Keep emoji-only replies silent (like a lone 👍)</span></label>
+          <p class="small muted">Tapback reactions ("Loved ...", "Reacted 😂 to ...") are always kept silent. They still show here in the dashboard.</p>
+          <label>Group name</label>
+          <div class="row"><input id="g-rename" style="max-width:320px"><button id="rename-btn">Save</button></div>
+          <label>Webhook for this number</label>
+          <code class="small" id="g-webhook"></code>
+          <p class="small muted">In Twilio, set this number's "A message comes in" webhook to the URL above (HTTP POST).</p>
+          <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
+          <button class="danger" id="delete-group">Delete group</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const state = { groups: [], groupId: null, tab: 'messages', config: {}, lastFeed: '' };
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    method: opts.method || 'GET',
+    headers: opts.body ? { 'Content-Type': 'application/json' } : {},
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && path !== '/api/login') { showLogin(); throw new Error('Log in first'); }
+  if (!res.ok) throw new Error(data.error || 'Something went wrong');
+  return data;
+}
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtPhone = (p) => { const m = String(p).match(/^\+1(\d{3})(\d{3})(\d{4})$/); return m ? `(${m[1]}) ${m[2]}-${m[3]}` : p; };
+const initials = (n) => String(n || '?').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+const when = (iso) => { const d = new Date(iso.replace(' ', 'T') + 'Z'); return d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); };
+
+function showLogin() { $('#login').classList.remove('hidden'); $('#app').classList.add('hidden'); }
+$('#login-form').onsubmit = async (e) => {
+  e.preventDefault();
+  try { await api('/api/login', { method: 'POST', body: { password: $('#pw').value } }); start(); }
+  catch (err) { $('#login-error').textContent = err.message; }
+};
+$('#logout').onclick = async () => { await api('/api/logout', { method: 'POST' }); showLogin(); };
+
+async function start() {
+  try { state.config = await api('/api/config'); } catch { return; }
+  $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
+  const sim = state.config.provider === 'sim';
+  $('#sim-link').classList.toggle('hidden', !sim);
+  $('#provider-note').textContent = sim ? 'Simulator mode: no real texts are sent.' : 'Live: sending real texts via Twilio.';
+  $('#number-help').textContent = sim ? 'Simulator mode: any number works, e.g. +1 555 000 1000.' : 'Buy a number in Twilio, then paste it here.';
+  $('#from-name').value = localStorage.getItem('fromName') || '';
+  await loadGroups();
+  setInterval(refresh, 3000);
+}
+
+async function loadGroups() {
+  state.groups = await api('/api/groups');
+  if (!state.groups.find((g) => g.id === state.groupId)) state.groupId = state.groups[0]?.id ?? null;
+  renderGroupList();
+  if (state.groupId) await openGroup(state.groupId);
+  else if ($('#new-group').classList.contains('hidden')) { $('#nothing').classList.remove('hidden'); $('#group').classList.add('hidden'); }
+}
+
+function renderGroupList() {
+  $('#group-list').innerHTML = state.groups.map((g) => `
+    <button class="group-item ${g.id === state.groupId ? 'active' : ''}" data-id="${g.id}">
+      <div class="name">${esc(g.name)}</div>
+      <div class="meta">${g.active_count} joined · ${g.mode === 'announce' ? 'announcements' : 'group chat'}</div>
+    </button>`).join('');
+  document.querySelectorAll('.group-item').forEach((b) => b.onclick = () => openGroup(+b.dataset.id));
+}
+
+function showNewGroup() {
+  $('#new-group').classList.remove('hidden'); $('#group').classList.add('hidden'); $('#nothing').classList.add('hidden');
+}
+$('#new-group-btn').onclick = showNewGroup;
+$('#cancel-new-group').onclick = () => { $('#new-group').classList.add('hidden'); loadGroups(); };
+$('#new-group-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(e.target));
+  try {
+    const g = await api('/api/groups', { method: 'POST', body: f });
+    e.target.reset(); $('#new-group').classList.add('hidden');
+    state.groupId = g.id; state.tab = 'members'; await loadGroups();
+  } catch (err) { $('#new-group-error').textContent = err.message; }
+};
+
+async function openGroup(id) {
+  state.groupId = id; state.lastFeed = '';
+  $('#new-group').classList.add('hidden'); $('#nothing').classList.add('hidden'); $('#group').classList.remove('hidden');
+  renderGroupList();
+  setTab(state.tab);
+  await refresh();
+}
+
+function current() { return state.groups.find((g) => g.id === state.groupId); }
+
+async function refresh() {
+  if (!state.groupId || $('#group').classList.contains('hidden')) return;
+  const [groups, members, messages] = await Promise.all([
+    api('/api/groups'), api(`/api/groups/${state.groupId}/members`), api(`/api/groups/${state.groupId}/messages`),
+  ]);
+  state.groups = groups; renderGroupList();
+  const g = current(); if (!g) return loadGroups();
+  $('#g-name').textContent = g.name;
+  $('#g-number').textContent = fmtPhone(g.phone_number);
+  $('#g-mode').value = g.mode;
+  $('#g-emoji').checked = !!g.suppress_emoji_only;
+  if (document.activeElement !== $('#g-rename')) $('#g-rename').value = g.name;
+  $('#g-webhook').textContent = state.config.webhookUrl;
+  $('#s-active').textContent = members.filter((m) => m.status === 'active').length;
+  $('#s-invited').textContent = members.filter((m) => m.status === 'invited').length;
+  $('#s-msgs').textContent = messages.filter((m) => m.kind === 'message').length;
+  $('#s-quiet').textContent = g.reactions_blocked;
+  renderMembers(members);
+  renderFeed(messages);
+}
+
+function renderFeed(messages) {
+  const shown = messages.filter((m) => m.kind !== 'command');
+  const key = JSON.stringify(shown.map((m) => [m.id, m.delivered_to]));
+  if (key === state.lastFeed) return; state.lastFeed = key;
+  const feed = $('#feed');
+  const atBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 40;
+  if (!shown.length) { feed.innerHTML = '<div class="empty">No messages yet. Texts sent to the group number will show up here.</div>'; return; }
+  feed.innerHTML = shown.map((m) => {
+    const who = m.direction === 'out' ? (m.note || 'Organizer') : (m.member_name || 'Removed member');
+    const media = JSON.parse(m.media_urls || '[]').map((u) => `<div><a href="${esc(u)}" target="_blank" rel="noopener">Photo</a></div>`).join('');
+    if (m.kind === 'reaction') {
+      return `<div class="msg silenced"><div></div><div><div class="body">${esc(who)} reacted: <em>${esc(m.body)}</em> <span class="chip good">silent</span></div></div></div>`;
+    }
+    const sub = m.note === 'to organizers' ? '<span class="chip warn">to organizers only</span> ' : '';
+    return `<div class="msg"><div class="avatar">${esc(initials(who))}</div><div>
+      <div class="who">${esc(who)}<span class="when">${when(m.created_at)}</span></div>
+      <div class="body">${esc(m.body)}</div>${media}
+      <div class="sub">${sub}delivered to ${m.delivered_to}</div></div></div>`;
+  }).join('');
+  if (atBottom || !feed.dataset.init) { feed.scrollTop = feed.scrollHeight; feed.dataset.init = 1; }
+}
+
+const statusChip = { active: '<span class="chip good">joined</span>', invited: '<span class="chip warn">invited</span>', opted_out: '<span class="chip bad">opted out</span>' };
+function renderMembers(members) {
+  $('#members').innerHTML = members.length ? members.map((m) => `<tr>
+    <td>${esc(m.name)}</td>
+    <td class="num">${fmtPhone(m.phone)}</td>
+    <td><select data-role="${m.id}" style="padding:3px 6px;width:auto">
+      <option value="member" ${m.role === 'member' ? 'selected' : ''}>Member</option>
+      <option value="admin" ${m.role === 'admin' ? 'selected' : ''}>Organizer</option></select></td>
+    <td>${statusChip[m.status]} ${m.muted ? '<span class="chip">muted</span>' : ''}</td>
+    <td style="text-align:right">${m.status === 'invited' ? `<button class="link small" data-invite="${m.id}">Resend invite</button>` : ''}
+      <button class="link small danger" data-remove="${m.id}">Remove</button></td></tr>`).join('')
+    : '<tr><td colspan="5" class="muted">No members yet. Add people below.</td></tr>';
+  document.querySelectorAll('[data-role]').forEach((s) => s.onchange = () => api(`/api/members/${s.dataset.role}`, { method: 'PATCH', body: { role: s.value } }).then(refresh));
+  document.querySelectorAll('[data-invite]').forEach((b) => b.onclick = () => api(`/api/members/${b.dataset.invite}/invite`, { method: 'POST' }).then(() => { b.textContent = 'Sent'; }));
+  document.querySelectorAll('[data-remove]').forEach((b) => b.onclick = async () => { b.textContent = 'Removing...'; await api(`/api/members/${b.dataset.remove}`, { method: 'DELETE' }); refresh(); });
+}
+
+function setTab(tab) {
+  state.tab = tab;
+  document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+  ['messages', 'members', 'settings'].forEach((t) => $(`#tab-${t}`).classList.toggle('hidden', t !== tab));
+}
+document.querySelectorAll('.tabs button').forEach((b) => b.onclick = () => setTab(b.dataset.tab));
+
+$('#g-mode').onchange = () => api(`/api/groups/${state.groupId}`, { method: 'PATCH', body: { mode: $('#g-mode').value } }).then(refresh);
+$('#g-emoji').onchange = () => api(`/api/groups/${state.groupId}`, { method: 'PATCH', body: { suppressEmojiOnly: $('#g-emoji').checked } }).then(refresh);
+$('#rename-btn').onclick = () => api(`/api/groups/${state.groupId}`, { method: 'PATCH', body: { name: $('#g-rename').value } }).then(refresh);
+$('#delete-group').onclick = async () => {
+  const b = $('#delete-group');
+  if (b.dataset.armed !== '1') { b.dataset.armed = '1'; b.textContent = 'Click again to delete this group and its history'; return; }
+  await api(`/api/groups/${state.groupId}`, { method: 'DELETE' });
+  b.dataset.armed = ''; b.textContent = 'Delete group'; state.groupId = null; loadGroups();
+};
+
+$('#add-member-form').onsubmit = async (e) => {
+  e.preventDefault();
+  try { await api(`/api/groups/${state.groupId}/members`, { method: 'POST', body: Object.fromEntries(new FormData(e.target)) }); e.target.reset(); $('#add-member-error').textContent = ''; refresh(); }
+  catch (err) { $('#add-member-error').textContent = err.message; }
+};
+$('#bulk-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const r = await api(`/api/groups/${state.groupId}/members/bulk`, { method: 'POST', body: { text: e.target.text.value } });
+  e.target.text.value = r.errors.map((x) => x.line).join('\n');
+  $('#bulk-error').style.color = r.errors.length ? '' : 'var(--good)';
+  $('#bulk-error').textContent = `Added ${r.added.length}.` + (r.errors.length ? ` ${r.errors.length} line(s) need fixing: ` + r.errors.map((x) => x.error).join('; ') : '');
+  refresh();
+};
+
+function segments(text) {
+  const gsm = /^[\n\r A-Za-z0-9@£$¥èéùìòÇØøÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ!"#¤%&'()*+,\-./:;<=>?¡ÄÖÑÜ§¿äöñüà^{}\\\[~\]|€]*$/.test(text);
+  const len = [...text].length, single = gsm ? 160 : 70, multi = gsm ? 153 : 67;
+  return len <= single ? 1 : Math.ceil(len / multi);
+}
+$('#broadcast-body').oninput = () => {
+  const t = (($('#from-name').value || 'Organizer') + ': ') + $('#broadcast-body').value;
+  const n = segments(t), people = +$('#s-active').textContent;
+  $('#seg-count').textContent = $('#broadcast-body').value ? `· ${n} text${n > 1 ? 's' : ''} per person, ${n * people} total` : '';
+};
+$('#broadcast-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const body = $('#broadcast-body').value.trim(); if (!body) return;
+  const fromName = $('#from-name').value.trim() || 'Organizer';
+  localStorage.setItem('fromName', $('#from-name').value.trim());
+  await api(`/api/groups/${state.groupId}/broadcast`, { method: 'POST', body: { body, fromName } });
+  $('#broadcast-body').value = ''; $('#seg-count').textContent = ''; refresh();
+};
+$('#broadcast-body').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#broadcast-form').requestSubmit(); } };
+
+start();
+</script>
+</body>
+</html>

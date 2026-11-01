@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TextChain phone simulator</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="sim-top">
+  <div class="brand"><span class="dot"></span>Phone simulator</div>
+  <select id="group" style="width:auto"></select>
+  <span class="small muted">Each card is a member's phone. Try a tapback: nobody else buzzes.</span>
+  <span class="spacer"></span>
+  <a href="/" class="small">Back to dashboard</a>
+</div>
+<div class="phones" id="phones"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const seen = {};   // phone -> number of texts received so far
+const buzzes = {}; // phone -> notification count
+let groupId = null, members = [], group = null;
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, { method: opts.method || 'GET', headers: opts.body ? { 'Content-Type': 'application/json' } : {}, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  if (res.status === 401) { location.href = '/'; throw new Error('login'); }
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error);
+  return data;
+}
+
+async function init() {
+  const groups = await api('/api/groups');
+  if (!groups.length) { $('#phones').innerHTML = '<div class="empty">Create a group in the dashboard first.</div>'; return; }
+  $('#group').innerHTML = groups.map((g) => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
+  $('#group').onchange = () => load(+$('#group').value);
+  await load(groups[0].id);
+  setInterval(poll, 1200);
+}
+
+async function load(id) {
+  groupId = id;
+  group = (await api('/api/groups')).find((g) => g.id === id);
+  members = await api(`/api/groups/${id}/members`);
+  for (const k of Object.keys(seen)) delete seen[k];
+  for (const k of Object.keys(buzzes)) delete buzzes[k];
+  $('#phones').innerHTML = members.map((m, i) => `
+    <div class="phone" id="ph-${i}">
+      <div class="ph-head"><div class="t">${esc(group.name)}</div><div class="s">${esc(m.name)}'s phone · <span id="st-${i}"></span> <span class="badge hidden" id="bz-${i}"></span></div></div>
+      <div class="thread" id="th-${i}"></div>
+      <form class="ph-input" data-i="${i}"><input placeholder="Text Message" id="in-${i}"><button class="primary">Send</button></form>
+      <div class="ph-quick">
+        <button data-i="${i}" data-react="Loved">♥ Love last</button>
+        <button data-i="${i}" data-react="Laughed at">Haha last</button>
+        <button data-i="${i}" data-emoji="👍">👍</button>
+        <button data-i="${i}" data-cmd="YES">YES</button>
+        <button data-i="${i}" data-cmd="STOP">STOP</button>
+      </div>
+    </div>`).join('') || '<div class="empty">No members in this group yet.</div>';
+  document.querySelectorAll('.ph-input').forEach((f) => f.onsubmit = (e) => { e.preventDefault(); const i = +f.dataset.i; send(i, $(`#in-${i}`).value); $(`#in-${i}`).value = ''; });
+  document.querySelectorAll('[data-react]').forEach((b) => b.onclick = () => {
+    const i = +b.dataset.i;
+    const last = [...document.querySelectorAll(`#th-${i} .bubble.in`)].pop();
+    if (!last) return;
+    const text = last.textContent.replace(/^[^:]+:\s*/, '');
+    send(i, `${b.dataset.react} “${text.length > 40 ? text.slice(0, 40) + '…' : text}”`);
+  });
+  document.querySelectorAll('[data-emoji]').forEach((b) => b.onclick = () => send(+b.dataset.i, b.dataset.emoji));
+  document.querySelectorAll('[data-cmd]').forEach((b) => b.onclick = () => send(+b.dataset.i, b.dataset.cmd));
+  await poll(true);
+}
+
+async function send(i, body) {
+  if (!body.trim()) return;
+  await api('/api/sim/send', { method: 'POST', body: { group: groupId, phone: members[i].phone, body } });
+  poll();
+}
+
+async function poll(first = false) {
+  const fresh = await api(`/api/groups/${groupId}/members`);
+  await Promise.all(members.map(async (m, i) => {
+    const me = fresh.find((f) => f.id === m.id);
+    if (me) $(`#st-${i}`).textContent = me.status === 'active' ? (me.muted ? 'muted' : 'joined') : me.status.replace('_', ' ');
+    const thread = await api(`/api/sim/thread?group=${groupId}&phone=${encodeURIComponent(m.phone)}`);
+    const incoming = thread.filter((t) => t.dir === 'in').length;
+    if (seen[m.phone] !== undefined && incoming > seen[m.phone] && !first) {
+      buzzes[m.phone] = (buzzes[m.phone] || 0) + (incoming - seen[m.phone]);
+      const ph = $(`#ph-${i}`); ph.classList.remove('buzz'); void ph.offsetWidth; ph.classList.add('buzz');
+    }
+    seen[m.phone] = incoming;
+    const bz = $(`#bz-${i}`);
+    bz.classList.toggle('hidden', !buzzes[m.phone]); bz.textContent = `${buzzes[m.phone] || 0} buzz`;
+    const el = $(`#th-${i}`);
+    const html = thread.map((t) => t.dir === 'in'
+      ? `<div class="bubble in">${esc(t.body)}</div>`
+      : `<div class="bubble out ${t.kind === 'reaction' ? 'silenced' : ''}">${esc(t.body)}</div>${t.kind === 'reaction' ? '<div class="bubble-note">kept silent, nobody notified</div>' : ''}`).join('');
+    if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; el.scrollTop = el.scrollHeight; }
+  }));
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join group</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="login" style="margin-top:8vh">
+  <div class="brand"><span class="dot"></span>TextChain</div>
+  <form class="card join-card" id="join" style="margin-top:16px">
+    <div class="muted small">You're invited to</div>
+    <h1 id="g-name">&nbsp;</h1>
+    <ul class="join-perks">
+      <li>Free. No app store, no account, no password</li>
+      <li>Messages show up as notifications, like a text</li>
+      <li>Reactions never buzz your phone</li>
+    </ul>
+    <label for="name">Your name (what the group sees)</label>
+    <input id="name" maxlength="40" autocomplete="name" required>
+    <div id="sms-box" class="hidden">
+      <label for="phone">Mobile number <span class="muted">(optional)</span></label>
+      <input id="phone" type="tel" autocomplete="tel" placeholder="555-201-3344">
+      <label class="row small" style="margin-top:8px;align-items:flex-start;flex-wrap:nowrap">
+        <input type="checkbox" id="consent" style="width:auto;margin-top:2px">
+        <span style="color:var(--ink)">Text me organizer announcements if I'm not using the app. Msg &amp; data rates may apply. Reply STOP anytime.</span>
+      </label>
+    </div>
+    <div class="error" id="err"></div>
+    <button class="primary" style="width:100%;margin-top:10px">Join group</button>
+  </form>
+</div>
+<script>
+const code = location.pathname.split('/').pop();
+const $ = (s) => document.querySelector(s);
+fetch(`/api/join/${code}`).then((r) => r.json().then((d) => ({ ok: r.ok, d }))).then(({ ok, d }) => {
+  if (!ok) { $('#join').innerHTML = `<h2>Link not found</h2><p class="muted">${d.error}</p>`; return; }
+  $('#g-name').textContent = d.name; document.title = `Join ${d.name}`;
+  $('#sms-box').classList.toggle('hidden', !d.textsAvailable);
+});
+$('#join').onsubmit = async (e) => {
+  e.preventDefault();
+  const phone = $('#phone').value.trim();
+  if (phone && !$('#consent').checked) { $('#err').textContent = 'Check the box to get texts, or leave the number blank.'; return; }
+  const r = await fetch(`/api/join/${code}`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: $('#name').value, phone, smsConsent: $('#consent').checked }) });
+  const d = await r.json();
+  if (!r.ok) { $('#err').textContent = d.error; return; }
+  location.href = `/m/${d.token}`;
+};
+</script>
+</body>
+</html>

@@ -133,3 +133,57 @@ td.num { font-variant-numeric: tabular-nums; }
   .stats { grid-template-columns: repeat(2, 1fr); }
   .grid2 { grid-template-columns: 1fr; }
 }
+
+/* ---------- members' web app ---------- */
+.m-body { background: var(--panel); }
+.m-app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; max-width: 720px; margin: 0 auto; }
+.m-head {
+  display: flex; align-items: center; gap: 12px; padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top));
+  border-bottom: 1px solid var(--line); background: var(--panel);
+}
+.m-head > div { flex: 1; min-width: 0; text-align: center; }
+.m-title { font-weight: 700; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-sub { font-size: 12px; color: var(--muted); }
+.m-head::before { content: ''; width: 36px; }
+.m-icon { border: none; background: none; width: 36px; height: 36px; padding: 0; display: grid; place-items: center; color: var(--muted); }
+.m-banner { margin: 10px 12px 0; padding: 10px 12px; border-radius: var(--radius); background: var(--accent-soft); font-size: 14px; }
+.m-banner .row span { flex: 1; }
+.m-share { display: inline-grid; place-items: center; vertical-align: -2px; color: var(--accent); }
+.m-feed { flex: 1; overflow-y: auto; padding: 12px 12px 4px; display: flex; flex-direction: column; gap: 2px; -webkit-overflow-scrolling: touch; }
+.m-day { text-align: center; font-size: 12px; color: var(--muted); margin: 14px 0 6px; }
+.m-row { display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 4px; }
+.m-row.me { align-items: flex-end; }
+.m-name { font-size: 12px; color: var(--muted); margin: 6px 0 2px 12px; }
+.m-bubble-wrap { display: flex; align-items: center; gap: 4px; max-width: 85%; }
+.m-row.me .m-bubble-wrap { flex-direction: row-reverse; }
+.m-bubble {
+  background: var(--bubble-in); padding: 8px 12px; border-radius: 18px; border-bottom-left-radius: 6px;
+  white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere; font-size: 16px; line-height: 1.35; min-width: 0;
+}
+.m-bubble.me { background: var(--bubble-out); color: #fff; border-bottom-left-radius: 18px; border-bottom-right-radius: 6px; }
+.m-bubble.me a { color: #fff; }
+.m-bubble.quiet { font-size: 28px; background: none; padding: 0 4px; }
+.m-img { display: block; max-width: 220px; max-height: 260px; border-radius: 12px; margin-bottom: 4px; }
+.m-add { border: none; background: none; color: var(--muted); font-size: 16px; padding: 4px; opacity: 0.55; }
+.m-add:hover { opacity: 1; }
+.m-reacts { display: flex; gap: 4px; flex-wrap: wrap; margin: 3px 8px 0; }
+.m-react { padding: 1px 8px; border-radius: 999px; font-size: 13px; background: var(--panel); border: 1px solid var(--line); }
+.m-react.mine { border-color: var(--accent); background: var(--accent-soft); }
+.m-meta { font-size: 11px; color: var(--muted); margin: 2px 12px 0; }
+.m-picker {
+  position: fixed; z-index: 10; display: flex; gap: 2px; padding: 6px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 999px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+}
+.m-picker button { border: none; background: none; font-size: 22px; padding: 4px 6px; border-radius: 999px; }
+.m-picker button:hover { background: var(--bg); }
+.m-compose { padding: 8px 12px; padding-bottom: max(8px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--panel); }
+.m-compose textarea { border-radius: 20px; padding: 9px 14px; min-height: 40px; max-height: 140px; resize: none; font-size: 16px; }
+.m-send { border-radius: 50%; width: 40px; height: 40px; padding: 0; display: grid; place-items: center; flex: none; }
+.m-note { font-size: 12px; color: var(--warn); margin-bottom: 6px; }
+.m-sheet { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); display: flex; align-items: flex-end; justify-content: center; z-index: 20; }
+.m-sheet-card { background: var(--panel); width: 100%; max-width: 520px; border-radius: 18px 18px 0 0; padding: 20px 20px max(20px, env(safe-area-inset-bottom)); }
+
+/* ---------- join page ---------- */
+.join-card h1 { font-size: 24px; margin: 6px 0 4px; }
+.join-perks { list-style: none; padding: 0; margin: 14px 0; display: grid; gap: 6px; font-size: 14px; }
+.join-perks li::before { content: '✓'; color: var(--good); font-weight: 700; margin-right: 8px; }

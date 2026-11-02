@@ -1,14 +1,19 @@
 {
   "name": "textchain",
   "version": "0.1.0",
-  "description": "SMS group texting for schools, clubs, and teams. No app, no reaction notifications.",
+  "description": "Free group messaging for schools, clubs, and teams. No app store, no reaction notifications, optional text backup.",
   "type": "module",
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "start": "node --no-warnings src/server.js",
     "dev": "node --no-warnings --watch src/server.js",
     "test": "node --no-warnings --test test/*.test.js"
   },
   "license": "UNLICENSED",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "web-push": "3.6.7"
+  }
 }
